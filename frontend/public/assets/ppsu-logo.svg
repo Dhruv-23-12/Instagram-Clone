@@ -1,0 +1,30 @@
+<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer blue ring with stars -->
+  <circle cx="30" cy="30" r="28" fill="#0ea5e9" stroke="white" stroke-width="2"/>
+  
+  <!-- Stars around the ring -->
+  <g fill="white">
+    <polygon points="30,4 32,10 38,10 33,14 35,20 30,16 25,20 27,14 22,10 28,10" transform="rotate(0 30 30)"/>
+    <polygon points="30,4 32,10 38,10 33,14 35,20 30,16 25,20 27,14 22,10 28,10" transform="rotate(45 30 30)"/>
+    <polygon points="30,4 32,10 38,10 33,14 35,20 30,16 25,20 27,14 22,10 28,10" transform="rotate(90 30 30)"/>
+    <polygon points="30,4 32,10 38,10 33,14 35,20 30,16 25,20 27,14 22,10 28,10" transform="rotate(135 30 30)"/>
+    <polygon points="30,4 32,10 38,10 33,14 35,20 30,16 25,20 27,14 22,10 28,10" transform="rotate(180 30 30)"/>
+    <polygon points="30,4 32,10 38,10 33,14 35,20 30,16 25,20 27,14 22,10 28,10" transform="rotate(225 30 30)"/>
+    <polygon points="30,4 32,10 38,10 33,14 35,20 30,16 25,20 27,14 22,10 28,10" transform="rotate(270 30 30)"/>
+    <polygon points="30,4 32,10 38,10 33,14 35,20 30,16 25,20 27,14 22,10 28,10" transform="rotate(315 30 30)"/>
+  </g>
+  
+  <!-- Inner red circle with gradient -->
+  <defs>
+    <radialGradient id="redGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ef4444;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+  <circle cx="30" cy="30" r="20" fill="url(#redGradient)"/>
+  
+  <!-- Stylized figure (person/flame/Y shape) -->
+  <path d="M30 12 L25 20 L30 18 L35 20 Z" fill="#fbbf24"/>
+  <circle cx="30" cy="12" r="2" fill="#f59e0b"/>
+  <path d="M30 18 L26 25 L30 23 L34 25 Z" fill="#fbbf24"/>
+</svg>
