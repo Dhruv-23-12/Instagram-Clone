@@ -12,107 +12,6 @@ const Feed = () => {
   const [filter, setFilter] = useState('all'); // all, following, trending
   const [sortBy, setSortBy] = useState('latest'); // latest, popular, trending
 
-  // Mock data for posts - replace with actual API calls
-  const mockPosts = [
-    {
-      id: '1',
-      content: 'Excited to announce the upcoming PPSU Tech Symposium 2024! This year we have amazing speakers from top tech companies. Don\'t miss out on this incredible learning opportunity! 🚀 #PPSUFest2024 #Technology #Innovation',
-      author: {
-        id: '1',
-        name: 'Dr. Rajesh Kumar',
-        role: 'Professor',
-        department: 'Computer Science',
-        isVerified: true
-      },
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-      likesCount: 45,
-      commentsCount: 12,
-      sharesCount: 8,
-      isLiked: false,
-      isBookmarked: false,
-      isPinned: false,
-      location: 'PPSU Campus',
-      hashtags: ['#PPSUFest2024', '#Technology', '#Innovation'],
-      mentions: [],
-      media: [
-        {
-          type: 'image',
-          url: 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=800&h=400&fit=crop'
-        }
-      ],
-      comments: [
-        {
-          id: '1',
-          content: 'Looking forward to it!',
-          author: { name: 'Priya Sharma' },
-          createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000)
-        }
-      ]
-    },
-    {
-      id: '2',
-      content: 'Just finished an amazing machine learning workshop! The hands-on experience with real datasets was incredible. Thanks to all the participants for their enthusiasm! 🤖 #MachineLearning #AI #Workshop',
-      author: {
-        id: '2',
-        name: 'Priya Sharma',
-        role: 'Student',
-        department: 'Information Technology',
-        isVerified: false
-      },
-      createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-      likesCount: 23,
-      commentsCount: 8,
-      sharesCount: 3,
-      isLiked: true,
-      isBookmarked: false,
-      isPinned: false,
-      location: 'PPSU Lab',
-      hashtags: ['#MachineLearning', '#AI', '#Workshop'],
-      mentions: [],
-      media: [
-        {
-          type: 'image',
-          url: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=800&h=400&fit=crop'
-        }
-      ],
-      comments: []
-    },
-    {
-      id: '3',
-      content: 'Campus life at PPSU is simply amazing! The library has been my second home this semester. The peaceful environment and helpful staff make studying so much more enjoyable. 📚 #CampusLife #Study #PPSU',
-      author: {
-        id: '3',
-        name: 'Amit Patel',
-        role: 'Student',
-        department: 'Computer Science',
-        isVerified: false
-      },
-      createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
-      likesCount: 67,
-      commentsCount: 15,
-      sharesCount: 12,
-      isLiked: false,
-      isBookmarked: true,
-      isPinned: false,
-      location: 'PPSU Library',
-      hashtags: ['#CampusLife', '#Study', '#PPSU'],
-      mentions: [],
-      media: [
-        {
-          type: 'image',
-          url: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=400&fit=crop'
-        }
-      ],
-      comments: [
-        {
-          id: '2',
-          content: 'I totally agree! The library is the best place to study.',
-          author: { name: 'Sneha Gupta' },
-          createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000)
-        }
-      ]
-    }
-  ];
 
   // Fetch posts from API
   const fetchPosts = async ({ pageParam = 1 }) => {
@@ -164,10 +63,18 @@ const Feed = () => {
     }
   }, []);
 
-  const handleComment = useCallback((postId) => {
-    // TODO: Implement comment functionality
-    console.log('Comment on post:', postId);
-  }, []);
+  const handleComment = useCallback(async (postId, content) => {
+    try {
+      if (content && content.trim()) {
+        await postApi.addComment(postId, content.trim());
+        toast.success('Comment added successfully');
+        refetch(); // Refresh the feed to show updated comment count
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      toast.error('Failed to add comment');
+    }
+  }, [refetch]);
 
   const handleShare = useCallback(async (post) => {
     try {
@@ -203,6 +110,17 @@ const Feed = () => {
       toast.error('Failed to report post');
     }
   }, []);
+
+  const handleDelete = useCallback(async (postId) => {
+    try {
+      await postApi.deletePost(postId);
+      toast.success('Post deleted successfully');
+      refetch(); // Refresh the feed
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      toast.error('Failed to delete post');
+    }
+  }, [refetch]);
 
   const handleCreatePost = () => {
     setShowCreateModal(true);
@@ -326,15 +244,16 @@ const Feed = () => {
             }
           >
             <div className="space-y-6">
-              {posts.map((post) => (
+              {posts.map((post, index) => (
                 <PostCard
-                  key={post.id}
+                  key={post.id || post._id || `post-${index}`}
                   post={post}
                   onLike={handleLike}
                   onComment={handleComment}
                   onShare={handleShare}
                   onBookmark={handleBookmark}
                   onReport={handleReport}
+                  onDelete={handleDelete}
                 />
               ))}
             </div>

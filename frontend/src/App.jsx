@@ -16,9 +16,9 @@ import CreatePost from './pages/CreatePost.jsx';
 import Stories from './pages/Stories.jsx';
 import SearchResults from './pages/SearchResults.jsx';
 
+
 // Components
 import Header from './components/Header.jsx';
-import Footer from './components/Footer.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 function App() {
@@ -91,8 +91,6 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
-        
-        <Footer />
       </div>
     </QueryProvider>
   );

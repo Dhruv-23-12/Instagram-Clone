@@ -12,17 +12,6 @@ const SearchBar = ({ placeholder = "Search PPSU Social...", className = "" }) =>
   const searchRef = useRef(null);
   const navigate = useNavigate();
 
-  // Mock suggestions - replace with actual API calls
-  const mockSuggestions = [
-    { type: 'user', name: 'Dr. Rajesh Kumar', subtitle: 'Computer Science Professor', avatar: null },
-    { type: 'user', name: 'Priya Sharma', subtitle: 'Final Year Student', avatar: null },
-    { type: 'hashtag', name: '#PPSUFest2024', subtitle: '125 posts', avatar: null },
-    { type: 'hashtag', name: '#CampusLife', subtitle: '89 posts', avatar: null },
-    { type: 'event', name: 'Tech Symposium 2024', subtitle: 'Dec 15, 2024', avatar: null },
-    { type: 'event', name: 'Cultural Night', subtitle: 'Dec 20, 2024', avatar: null },
-    { type: 'location', name: 'Main Auditorium', subtitle: 'PPSU Campus', avatar: null },
-    { type: 'location', name: 'Library', subtitle: 'PPSU Campus', avatar: null },
-  ];
 
   useEffect(() => {
     const fetchSuggestions = async () => {

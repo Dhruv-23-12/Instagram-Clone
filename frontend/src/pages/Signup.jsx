@@ -45,7 +45,7 @@ const Signup = () => {
       <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="text-center">
           <div className="flex justify-center mb-6">
-            <PPSUBranding size="large" showText={true} />
+            <PPSUBranding size="large" showText={true} showNAAC={true} />
           </div>
           <h2 className="mt-6 text-4xl font-bold text-slate-900">
             Join <span className="gradient-text">PPSU Social</span>

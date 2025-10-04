@@ -40,7 +40,7 @@ const CreatePostModal = ({ isOpen, onClose, onPostCreated }) => {
       };
 
       // Create the post
-      await postApi.createPost(postData);
+      const response = await postApi.createPost(postData);
       
       toast.success('Post created successfully!');
 
@@ -54,7 +54,13 @@ const CreatePostModal = ({ isOpen, onClose, onPostCreated }) => {
       onPostCreated?.();
     } catch (error) {
       console.error('Error creating post:', error);
-      toast.error('Failed to create post. Please try again.');
+      console.error('Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      });
+      toast.error(`Failed to create post: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }

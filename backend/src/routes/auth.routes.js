@@ -18,7 +18,7 @@ const loginSchema = z.object({
   password: z.string().min(1)
 });
 
-// Get allowed email domains
+// Get allowed email domains (allow all for development)
 const ALLOWED_EMAIL_DOMAINS = (process.env.ALLOWED_EMAIL_DOMAINS || '').split(',').map(d => d.trim()).filter(Boolean);
 
 // Register
@@ -72,33 +72,40 @@ router.post('/register', async (req, res) => {
 // Login
 router.post('/login', async (req, res) => {
   try {
+    console.log('Login attempt:', { email: req.body.email, hasPassword: !!req.body.password });
+    
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
+      console.log('Validation failed:', parsed.error.errors);
       return res.status(400).json({ message: 'Invalid input', errors: parsed.error.errors });
     }
 
     const { email, password } = parsed.data;
 
-    // Check email domain
+    // Check email domain (only if domains are configured)
     if (ALLOWED_EMAIL_DOMAINS.length > 0 && !ALLOWED_EMAIL_DOMAINS.some(domain => email.endsWith(`@${domain}`))) {
+      console.log('Email domain not allowed:', email, 'Allowed domains:', ALLOWED_EMAIL_DOMAINS);
       return res.status(403).json({ message: 'Login restricted to PPSU email domains.' });
     }
 
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
+      console.log('User not found:', email);
       return res.status(400).json({ message: 'Invalid credentials.' });
     }
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      console.log('Password mismatch for user:', email);
       return res.status(400).json({ message: 'Invalid credentials.' });
     }
 
     // Generate token
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
+    console.log('Login successful for user:', email);
     res.json({
       message: 'Login successful',
       token,

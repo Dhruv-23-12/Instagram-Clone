@@ -14,33 +14,65 @@ const updateProfileSchema = z.object({
   avatarUrl: z.string().url().optional()
 });
 
+
 // Get user profile
 router.get('/:id', async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
+    const userId = req.params.id;
+    
+    // Validate user ID format
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    
+    // Check if it's a valid MongoDB ObjectId format
+    if (!/^[0-9a-fA-F]{24}$/.test(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+    
+    const user = await User.findById(userId).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Get user's posts
-    const posts = await Post.find({ author: user._id, isPublic: true })
-      .sort({ createdAt: -1 })
-      .limit(12)
-      .lean();
+    // Check if current user is following this user (if authenticated)
+    let isFollowing = false;
+    let isCurrentUser = false;
+    
+    if (req.user && req.user._id.toString() === user._id.toString()) {
+      isCurrentUser = true;
+    } else if (req.user) {
+      const follow = await Follow.findOne({
+        follower: req.user._id,
+        following: user._id
+      });
+      isFollowing = !!follow;
+    }
 
     res.json({ 
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
-        avatarUrl: user.avatarUrl,
+        role: user.role || 'Student',
+        department: user.department || 'General',
+        phone: user.phone,
+        location: user.location,
+        website: user.website,
         bio: user.bio,
-        followersCount: user.followersCount,
-        followingCount: user.followingCount,
-        postsCount: user.postsCount,
-        isVerified: user.isVerified
-      },
-      posts
+        avatar: user.avatarUrl,
+        coverUrl: user.coverUrl,
+        isVerified: user.isVerified || false,
+        isFollowing,
+        isCurrentUser,
+        followersCount: user.followersCount || 0,
+        followingCount: user.followingCount || 0,
+        postsCount: user.postsCount || 0,
+        joinedDate: user.createdAt || new Date(),
+        socialLinks: user.socialLinks || {},
+        achievements: user.achievements || [],
+        interests: user.interests || []
+      }
     });
   } catch (error) {
     console.error('Get user profile error:', error);

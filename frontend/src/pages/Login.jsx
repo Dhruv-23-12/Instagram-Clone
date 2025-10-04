@@ -24,11 +24,12 @@ const Login = () => {
     dispatch(clearError());
 
     try {
-      const response = await authApi.login(data);
+      const response = await authApi.login(data.email, data.password);
       dispatch(setUser(response.user));
       toast.success('Login successful!');
       navigate(from, { replace: true });
     } catch (error) {
+      console.error('Login error:', error);
       const message = error.response?.data?.message || 'Login failed';
       dispatch(setError(message));
       toast.error(message);
@@ -47,7 +48,7 @@ const Login = () => {
       <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="text-center">
           <div className="flex justify-center mb-6">
-            <PPSUBranding size="large" showText={true} />
+            <PPSUBranding size="large" showText={true} showNAAC={true} />
           </div>
           <h2 className="mt-6 text-4xl font-bold text-slate-900">
             Welcome back to <span className="gradient-text">PPSU Social</span>
@@ -69,13 +70,13 @@ const Login = () => {
                   {...register('email', { 
                     required: 'Email is required',
                     pattern: {
-                      value: /^[A-Z0-9._%+-]+@(ppsu\.ac\.in|ppsuni\.ac\.in)$/i,
-                      message: 'Please use a valid PPSU email address'
+                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                      message: 'Please use a valid email address'
                     }
                   })}
                   type="email"
                   className="input-modern pl-12"
-                  placeholder="your.email@ppsu.ac.in"
+                  placeholder="Enter your email address"
                 />
               </div>
               {errors.email && (

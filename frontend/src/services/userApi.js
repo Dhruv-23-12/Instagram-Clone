@@ -7,6 +7,12 @@ export const userApi = {
     return response.data;
   },
 
+  // Get all users (for debugging)
+  getUsers: async () => {
+    const response = await apiClient.get('/users');
+    return response.data;
+  },
+
   // Update user profile
   updateProfile: async (profileData) => {
     const response = await apiClient.put('/users/profile', profileData);

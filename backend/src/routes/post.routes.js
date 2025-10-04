@@ -9,8 +9,18 @@ const router = express.Router();
 
 // Validation schemas
 const createPostSchema = z.object({
+  content: z.string().max(500).optional(),
   caption: z.string().max(500).optional(),
-  imageUrl: z.string().url()
+  media: z.array(z.object({
+    type: z.enum(['image', 'video']),
+    url: z.string().url(),
+    thumbnail: z.string().url().optional(),
+    duration: z.number().optional(),
+    size: z.number().optional()
+  })).optional(),
+  location: z.string().max(200).optional(),
+  hashtags: z.array(z.string().max(50)).optional(),
+  mentions: z.array(z.string()).optional()
 });
 
 const commentSchema = z.object({
@@ -25,12 +35,27 @@ router.post('/', authRequired, async (req, res) => {
       return res.status(400).json({ message: 'Invalid input', errors: parsed.error.errors });
     }
 
-    const { caption, imageUrl } = parsed.data;
+    const { content, caption, media, location, hashtags, mentions } = parsed.data;
+
+    // Determine post type based on content and media
+    let postType = 'text';
+    if (media && media.length > 0) {
+      if (media.length === 1) {
+        postType = media[0].type;
+      } else {
+        postType = 'carousel';
+      }
+    }
 
     const post = new Post({
       author: req.user._id,
-      caption: caption || '',
-      imageUrl
+      content: content || caption || '',
+      caption: caption || content || '',
+      media: media || [],
+      postType,
+      location: location || undefined,
+      tags: hashtags || [],
+      mentions: mentions || []
     });
 
     await post.save();
@@ -60,7 +85,17 @@ router.get('/', async (req, res) => {
       .limit(limit)
       .lean();
 
-    res.json({ posts });
+    // Transform posts to include id field for frontend compatibility
+    const transformedPosts = posts.map(post => ({
+      ...post,
+      id: post._id,
+      author: {
+        ...post.author,
+        id: post.author._id
+      }
+    }));
+
+    res.json({ posts: transformedPosts });
   } catch (error) {
     console.error('Get posts error:', error);
     res.status(500).json({ message: 'Server error fetching posts.' });
@@ -222,6 +257,99 @@ router.delete('/:id', authRequired, async (req, res) => {
   } catch (error) {
     console.error('Delete post error:', error);
     res.status(500).json({ message: 'Server error deleting post.' });
+  }
+});
+
+// Upload media
+router.post('/upload', authRequired, async (req, res) => {
+  try {
+    // For now, we'll simulate a successful upload
+    // In a real app, you'd use multer or similar to handle file uploads
+    // and upload to cloud storage like AWS S3, Cloudinary, etc.
+    
+    // Generate a mock URL for the uploaded file
+    const mockUrl = `https://via.placeholder.com/800x600/4F46E5/FFFFFF?text=Uploaded+Image+${Date.now()}`;
+    
+    res.json({ 
+      url: mockUrl,
+      message: 'Media uploaded successfully' 
+    });
+  } catch (error) {
+    console.error('Upload media error:', error);
+    res.status(500).json({ message: 'Server error uploading media.' });
+  }
+});
+
+// Share post
+router.post('/:id/share', authRequired, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    // Increment shares count
+    await Post.findByIdAndUpdate(req.params.id, { $inc: { sharesCount: 1 } });
+
+    res.json({ message: 'Post shared successfully' });
+  } catch (error) {
+    console.error('Share post error:', error);
+    res.status(500).json({ message: 'Server error sharing post.' });
+  }
+});
+
+// Bookmark post
+router.post('/:id/bookmark', authRequired, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    // For now, just return success
+    // In a real app, you'd have a Bookmark model to track user bookmarks
+    res.json({ message: 'Post bookmarked successfully' });
+  } catch (error) {
+    console.error('Bookmark post error:', error);
+    res.status(500).json({ message: 'Server error bookmarking post.' });
+  }
+});
+
+// Remove bookmark
+router.delete('/:id/bookmark', authRequired, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    // For now, just return success
+    // In a real app, you'd have a Bookmark model to track user bookmarks
+    res.json({ message: 'Bookmark removed successfully' });
+  } catch (error) {
+    console.error('Remove bookmark error:', error);
+    res.status(500).json({ message: 'Server error removing bookmark.' });
+  }
+});
+
+// Report post
+router.post('/:id/report', authRequired, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    const { reason } = req.body;
+    
+    // For now, just return success
+    // In a real app, you'd have a Report model to track reports
+    console.log(`Post ${req.params.id} reported by user ${req.user._id} for reason: ${reason}`);
+    
+    res.json({ message: 'Post reported successfully' });
+  } catch (error) {
+    console.error('Report post error:', error);
+    res.status(500).json({ message: 'Server error reporting post.' });
   }
 });
 

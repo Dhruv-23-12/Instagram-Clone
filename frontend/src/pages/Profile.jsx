@@ -20,7 +20,7 @@ import {
   Camera,
   Plus
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, parseISO } from 'date-fns';
 import { userApi } from '../services/userApi.js';
 import { postApi } from '../services/postApi.js';
 import toast from 'react-hot-toast';
@@ -96,18 +96,63 @@ const Profile = () => {
 
   useEffect(() => {
     const loadProfile = async () => {
+      if (!userId) {
+        console.error('No user ID provided');
+        toast.error('Invalid user profile');
+        setIsLoading(false);
+        return;
+      }
+
+      if (userId === 'undefined' || userId === 'null') {
+        console.error('Invalid user ID:', userId);
+        toast.error('Invalid user profile');
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       try {
         // Load user profile
         const userResponse = await userApi.getUser(userId);
+        
+        if (!userResponse || !userResponse.user) {
+          throw new Error('Invalid response format from API');
+        }
+        
         setUser(userResponse.user);
         
         // Load user posts
-        const postsResponse = await userApi.getUserPosts(userId, 1, 10);
-        setPosts(postsResponse.posts || []);
+        try {
+          const postsResponse = await userApi.getUserPosts(userId, 1, 10);
+          setPosts(postsResponse.posts || []);
+        } catch (postsError) {
+          console.warn('Error loading posts:', postsError);
+          setPosts([]);
+        }
       } catch (error) {
         console.error('Error loading profile:', error);
-        toast.error('Failed to load profile');
+        console.error('Error details:', {
+          message: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          config: {
+            url: error.config?.url,
+            method: error.config?.method,
+            headers: error.config?.headers
+          }
+        });
+        
+        if (error.response?.status === 404) {
+          toast.error('User not found');
+        } else if (error.response?.status === 400) {
+          toast.error('Invalid user ID format');
+        } else if (error.response?.status === 500) {
+          toast.error('Server error. Please try again later.');
+        } else {
+          toast.error(`Failed to load profile: ${error.message}`);
+        }
+        
         setUser(null);
         setPosts([]);
       } finally {
@@ -136,16 +181,54 @@ const Profile = () => {
 
   const handleMessage = () => {
     // TODO: Implement messaging functionality
-    console.log('Message user:', user.id);
   };
 
   const handleShare = () => {
     // TODO: Implement share profile functionality
-    console.log('Share profile:', user.id);
   };
 
   const formatJoinDate = (date) => {
-    return `Joined ${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+    if (!date) return 'Joined recently';
+    
+    // Handle both Date objects and date strings
+    const dateObj = date instanceof Date ? date : new Date(date);
+    
+    // Check if the date is valid
+    if (isNaN(dateObj.getTime())) {
+      return 'Joined recently';
+    }
+    
+    return `Joined ${dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+  };
+
+  const formatTimeAgo = (date) => {
+    if (!date) return 'Just now';
+    
+    try {
+      // Handle both Date objects and date strings
+      let dateObj;
+      if (date instanceof Date) {
+        dateObj = date;
+      } else if (typeof date === 'string') {
+        // Try parseISO first for ISO strings, then fallback to new Date
+        dateObj = parseISO(date);
+        if (isNaN(dateObj.getTime())) {
+          dateObj = new Date(date);
+        }
+      } else {
+        dateObj = new Date(date);
+      }
+      
+      // Check if the date is valid
+      if (isNaN(dateObj.getTime())) {
+        return 'Just now';
+      }
+      
+      return formatDistanceToNow(dateObj, { addSuffix: true });
+    } catch (error) {
+      console.warn('Error formatting date:', error);
+      return 'Just now';
+    }
   };
 
   if (isLoading) {
@@ -412,7 +495,7 @@ const Profile = () => {
                         </div>
                         <div>
                           <h4 className="font-semibold text-slate-900">{user.name}</h4>
-                          <p className="text-sm text-slate-500">{formatDistanceToNow(post.createdAt)} ago</p>
+                          <p className="text-sm text-slate-500">{formatTimeAgo(post.createdAt)}</p>
                         </div>
                       </div>
                     </div>

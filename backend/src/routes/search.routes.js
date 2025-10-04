@@ -1,6 +1,8 @@
 import express from 'express';
 import { authRequired } from '../middleware/auth.js';
 import { generalLimiter } from '../middleware/rateLimiter.js';
+import User from '../models/User.js';
+import Post from '../models/Post.js';
 
 const router = express.Router();
 
@@ -13,9 +15,7 @@ router.get('/', authRequired, generalLimiter, async (req, res) => {
       return res.status(400).json({ message: 'Search query is required' });
     }
 
-    // TODO: Implement actual search logic with MongoDB text search
-    // For now, return mock data
-    const mockResults = {
+    const results = {
       users: [],
       posts: [],
       hashtags: [],
@@ -23,9 +23,68 @@ router.get('/', authRequired, generalLimiter, async (req, res) => {
       total: 0
     };
 
+    // Search users
+    const users = await User.find({
+      $or: [
+        { name: { $regex: q, $options: 'i' } },
+        { email: { $regex: q, $options: 'i' } },
+        { bio: { $regex: q, $options: 'i' } }
+      ]
+    })
+    .select('name email role department bio avatarUrl followersCount followingCount isVerified')
+    .limit(5)
+    .sort({ followersCount: -1 });
+
+    results.users = users;
+
+    // Search posts
+    const posts = await Post.find({
+      $or: [
+        { content: { $regex: q, $options: 'i' } },
+        { caption: { $regex: q, $options: 'i' } },
+        { tags: { $in: [new RegExp(q, 'i')] } }
+      ],
+      isPublic: true
+    })
+    .populate('author', 'name avatarUrl isVerified role')
+    .select('content caption media likesCount commentsCount sharesCount createdAt tags')
+    .limit(5)
+    .sort({ createdAt: -1 });
+
+    results.posts = posts;
+
+    // Search hashtags
+    const hashtagPosts = await Post.find({
+      tags: { $in: [new RegExp(q, 'i')] },
+      isPublic: true
+    })
+    .select('tags')
+    .limit(10);
+
+    const hashtagCounts = {};
+    hashtagPosts.forEach(post => {
+      post.tags.forEach(tag => {
+        if (tag.toLowerCase().includes(q.toLowerCase())) {
+          hashtagCounts[tag] = (hashtagCounts[tag] || 0) + 1;
+        }
+      });
+    });
+
+    results.hashtags = Object.entries(hashtagCounts)
+      .map(([name, postsCount]) => ({
+        name,
+        postsCount,
+        isTrending: postsCount > 10,
+        lastUsed: new Date()
+      }))
+      .sort((a, b) => b.postsCount - a.postsCount)
+      .slice(0, 5);
+
+    results.total = users.length + posts.length + results.hashtags.length;
+
     res.json({
       success: true,
-      data: mockResults,
+      results: results,
       query: q,
       filters: { type, sort, limit, offset }
     });
@@ -44,25 +103,35 @@ router.get('/users', authRequired, generalLimiter, async (req, res) => {
       return res.status(400).json({ message: 'Search query is required' });
     }
 
-    // TODO: Implement user search with MongoDB
-    const mockUsers = [
-      {
-        id: '1',
-        name: 'Dr. Rajesh Kumar',
-        email: 'rajesh.kumar@ppsu.ac.in',
-        role: 'Professor',
-        department: 'Computer Science',
-        avatar: null,
-        followersCount: 1250,
-        isVerified: true,
-        bio: 'Professor of Computer Science with expertise in AI and Machine Learning'
-      }
-    ];
+    // Build search query
+    const searchQuery = {
+      $or: [
+        { name: { $regex: q, $options: 'i' } },
+        { email: { $regex: q, $options: 'i' } },
+        { bio: { $regex: q, $options: 'i' } }
+      ]
+    };
+
+    // Add filters
+    if (department) {
+      searchQuery.department = { $regex: department, $options: 'i' };
+    }
+    if (role) {
+      searchQuery.role = role;
+    }
+
+    const users = await User.find(searchQuery)
+      .select('name email role department bio avatarUrl followersCount followingCount isVerified')
+      .limit(parseInt(limit))
+      .skip(parseInt(offset))
+      .sort({ followersCount: -1 });
+
+    const total = await User.countDocuments(searchQuery);
 
     res.json({
       success: true,
-      data: mockUsers,
-      total: mockUsers.length,
+      data: users,
+      total: total,
       query: q
     });
   } catch (error) {
@@ -80,28 +149,40 @@ router.get('/posts', authRequired, generalLimiter, async (req, res) => {
       return res.status(400).json({ message: 'Search query is required' });
     }
 
-    // TODO: Implement post search with MongoDB
-    const mockPosts = [
-      {
-        id: '1',
-        content: 'Excited about the upcoming tech symposium! #PPSUFest2024 #Technology',
-        author: {
-          id: '1',
-          name: 'Dr. Rajesh Kumar',
-          avatar: null
-        },
-        likesCount: 45,
-        commentsCount: 12,
-        createdAt: new Date(),
-        hashtags: ['#PPSUFest2024', '#Technology'],
-        media: []
+    // Build search query
+    const searchQuery = {
+      $or: [
+        { content: { $regex: q, $options: 'i' } },
+        { caption: { $regex: q, $options: 'i' } },
+        { tags: { $in: [new RegExp(q, 'i')] } }
+      ],
+      isPublic: true
+    };
+
+    // Add filters
+    if (author) {
+      const authorUser = await User.findOne({ name: { $regex: author, $options: 'i' } });
+      if (authorUser) {
+        searchQuery.author = authorUser._id;
       }
-    ];
+    }
+    if (hashtag) {
+      searchQuery.tags = { $in: [new RegExp(hashtag, 'i')] };
+    }
+
+    const posts = await Post.find(searchQuery)
+      .populate('author', 'name avatarUrl isVerified role')
+      .select('content caption media likesCount commentsCount sharesCount createdAt tags')
+      .limit(parseInt(limit))
+      .skip(parseInt(offset))
+      .sort({ createdAt: -1 });
+
+    const total = await Post.countDocuments(searchQuery);
 
     res.json({
       success: true,
-      data: mockPosts,
-      total: mockPosts.length,
+      data: posts,
+      total: total,
       query: q
     });
   } catch (error) {
@@ -119,26 +200,39 @@ router.get('/hashtags', authRequired, generalLimiter, async (req, res) => {
       return res.status(400).json({ message: 'Search query is required' });
     }
 
-    // TODO: Implement hashtag search with MongoDB
-    const mockHashtags = [
-      {
-        name: '#PPSUFest2024',
-        postsCount: 125,
-        isTrending: true,
+    // Search for posts with matching hashtags
+    const posts = await Post.find({
+      tags: { $in: [new RegExp(q, 'i')] },
+      isPublic: true
+    })
+    .select('tags')
+    .limit(parseInt(limit) * 2); // Get more to aggregate
+
+    // Aggregate hashtags
+    const hashtagCounts = {};
+    posts.forEach(post => {
+      post.tags.forEach(tag => {
+        if (tag.toLowerCase().includes(q.toLowerCase())) {
+          hashtagCounts[tag] = (hashtagCounts[tag] || 0) + 1;
+        }
+      });
+    });
+
+    // Convert to array and sort by count
+    const hashtags = Object.entries(hashtagCounts)
+      .map(([name, postsCount]) => ({
+        name,
+        postsCount,
+        isTrending: postsCount > 10,
         lastUsed: new Date()
-      },
-      {
-        name: '#CampusLife',
-        postsCount: 89,
-        isTrending: false,
-        lastUsed: new Date()
-      }
-    ];
+      }))
+      .sort((a, b) => b.postsCount - a.postsCount)
+      .slice(0, parseInt(limit));
 
     res.json({
       success: true,
-      data: mockHashtags,
-      total: mockHashtags.length,
+      data: hashtags,
+      total: hashtags.length,
       query: q
     });
   } catch (error) {
@@ -156,30 +250,11 @@ router.get('/events', authRequired, generalLimiter, async (req, res) => {
       return res.status(400).json({ message: 'Search query is required' });
     }
 
-    // TODO: Implement event search with MongoDB
-    const mockEvents = [
-      {
-        id: '1',
-        title: 'Tech Symposium 2024',
-        description: 'Annual technology symposium featuring latest innovations',
-        date: new Date('2024-12-15'),
-        time: '10:00 AM',
-        location: 'Main Auditorium',
-        attendeesCount: 150,
-        maxAttendees: 200,
-        organizer: {
-          id: '1',
-          name: 'Dr. Rajesh Kumar'
-        },
-        image: null,
-        tags: ['Technology', 'Innovation', 'PPSU']
-      }
-    ];
-
+    // For now, return empty results as events are not implemented yet
     res.json({
       success: true,
-      data: mockEvents,
-      total: mockEvents.length,
+      data: [],
+      total: 0,
       query: q
     });
   } catch (error) {
@@ -197,16 +272,58 @@ router.get('/suggestions', authRequired, generalLimiter, async (req, res) => {
       return res.json({ success: true, data: [] });
     }
 
-    // TODO: Implement suggestion logic with MongoDB
-    const mockSuggestions = [
-      { type: 'user', name: 'Dr. Rajesh Kumar', subtitle: 'Computer Science Professor' },
-      { type: 'hashtag', name: '#PPSUFest2024', subtitle: '125 posts' },
-      { type: 'event', name: 'Tech Symposium 2024', subtitle: 'Dec 15, 2024' }
-    ];
+    const suggestions = [];
+
+    // Search users
+    const users = await User.find({
+      $or: [
+        { name: { $regex: q, $options: 'i' } },
+        { email: { $regex: q, $options: 'i' } }
+      ]
+    })
+    .select('name role department')
+    .limit(3);
+
+    users.forEach(user => {
+      suggestions.push({
+        type: 'user',
+        name: user.name,
+        subtitle: `${user.role}${user.department ? ` • ${user.department}` : ''}`,
+        avatar: null
+      });
+    });
+
+    // Search hashtags
+    const posts = await Post.find({
+      tags: { $in: [new RegExp(q, 'i')] },
+      isPublic: true
+    })
+    .select('tags')
+    .limit(10);
+
+    const hashtagCounts = {};
+    posts.forEach(post => {
+      post.tags.forEach(tag => {
+        if (tag.toLowerCase().includes(q.toLowerCase())) {
+          hashtagCounts[tag] = (hashtagCounts[tag] || 0) + 1;
+        }
+      });
+    });
+
+    Object.entries(hashtagCounts)
+      .slice(0, 2)
+      .forEach(([name, count]) => {
+        suggestions.push({
+          type: 'hashtag',
+          name: name,
+          subtitle: `${count} posts`,
+          avatar: null
+        });
+      });
 
     res.json({
       success: true,
-      data: mockSuggestions
+      data: suggestions
     });
   } catch (error) {
     console.error('Search suggestions error:', error);
@@ -217,16 +334,30 @@ router.get('/suggestions', authRequired, generalLimiter, async (req, res) => {
 // Get trending topics
 router.get('/trending', authRequired, async (req, res) => {
   try {
-    // TODO: Implement trending topics logic
-    const mockTrending = [
-      { name: '#PPSUFest2024', postsCount: 125, growth: '+15%' },
-      { name: '#TechSymposium', postsCount: 45, growth: '+8%' },
-      { name: '#CampusLife', postsCount: 89, growth: '+3%' }
-    ];
+    // Get trending hashtags from posts
+    const posts = await Post.find({ isPublic: true })
+      .select('tags')
+      .limit(100);
+
+    const hashtagCounts = {};
+    posts.forEach(post => {
+      post.tags.forEach(tag => {
+        hashtagCounts[tag] = (hashtagCounts[tag] || 0) + 1;
+      });
+    });
+
+    const trending = Object.entries(hashtagCounts)
+      .map(([name, postsCount]) => ({
+        name,
+        postsCount,
+        growth: '+0%' // Placeholder for now
+      }))
+      .sort((a, b) => b.postsCount - a.postsCount)
+      .slice(0, 10);
 
     res.json({
       success: true,
-      data: mockTrending
+      data: trending
     });
   } catch (error) {
     console.error('Trending topics error:', error);
@@ -239,17 +370,10 @@ router.get('/recent', authRequired, async (req, res) => {
   try {
     const userId = req.user.id;
     
-    // TODO: Implement recent searches from user's search history
-    const mockRecent = [
-      'Dr. Rajesh Kumar',
-      'PPSUFest2024',
-      'Tech Symposium',
-      'Campus Life'
-    ];
-
+    // For now, return empty array as search history is not implemented yet
     res.json({
       success: true,
-      data: mockRecent
+      data: []
     });
   } catch (error) {
     console.error('Recent searches error:', error);
@@ -267,7 +391,7 @@ router.post('/save', authRequired, async (req, res) => {
       return res.status(400).json({ message: 'Search query is required' });
     }
 
-    // TODO: Save search query to user's search history
+    // For now, just return success as search history is not implemented yet
     res.json({
       success: true,
       message: 'Search query saved'

@@ -14,11 +14,12 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
-const PostCard = ({ post, onLike, onComment, onShare, onBookmark, onReport }) => {
+const PostCard = ({ post, onLike, onComment, onShare, onBookmark, onReport, onDelete }) => {
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
   const [isBookmarked, setIsBookmarked] = useState(post.isBookmarked || false);
   const [showComments, setShowComments] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [commentText, setCommentText] = useState('');
 
   const handleLike = () => {
     setIsLiked(!isLiked);
@@ -32,7 +33,14 @@ const PostCard = ({ post, onLike, onComment, onShare, onBookmark, onReport }) =>
 
   const handleComment = () => {
     setShowComments(!showComments);
-    onComment?.(post.id);
+  };
+
+  const handleCommentSubmit = (e) => {
+    e.preventDefault();
+    if (commentText.trim()) {
+      onComment?.(post.id, commentText);
+      setCommentText('');
+    }
   };
 
   const handleShare = () => {
@@ -42,6 +50,13 @@ const PostCard = ({ post, onLike, onComment, onShare, onBookmark, onReport }) =>
   const handleReport = () => {
     onReport?.(post.id);
     setShowMore(false);
+  };
+
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to delete this post?')) {
+      onDelete?.(post.id);
+      setShowMore(false);
+    }
   };
 
   const formatTimeAgo = (date) => {
@@ -175,35 +190,48 @@ const PostCard = ({ post, onLike, onComment, onShare, onBookmark, onReport }) =>
             <MoreHorizontal className="h-5 w-5" />
           </button>
           
-          {showMore && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-large border border-slate-200 py-2 z-10">
-              <button
-                onClick={handleBookmark}
-                className="w-full px-4 py-2 text-left text-slate-700 hover:bg-slate-50 flex items-center space-x-2"
-              >
-                <Bookmark className="h-4 w-4" />
-                <span>{isBookmarked ? 'Remove from Bookmarks' : 'Save Post'}</span>
-              </button>
-              <button
-                onClick={handleReport}
-                className="w-full px-4 py-2 text-left text-slate-700 hover:bg-slate-50 flex items-center space-x-2"
-              >
-                <Flag className="h-4 w-4" />
-                <span>Report Post</span>
-              </button>
-            </div>
-          )}
+           {showMore && (
+             <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-large border border-slate-200 py-2 z-10">
+               <button
+                 onClick={handleBookmark}
+                 className="w-full px-4 py-2 text-left text-slate-700 hover:bg-slate-50 flex items-center space-x-2"
+               >
+                 <Bookmark className="h-4 w-4" />
+                 <span>{isBookmarked ? 'Remove from Bookmarks' : 'Save Post'}</span>
+               </button>
+               {post.isCurrentUser && (
+                 <button
+                   onClick={handleDelete}
+                   className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                 >
+                   <Flag className="h-4 w-4" />
+                   <span>Delete Post</span>
+                 </button>
+               )}
+               {!post.isCurrentUser && (
+                 <button
+                   onClick={handleReport}
+                   className="w-full px-4 py-2 text-left text-slate-700 hover:bg-slate-50 flex items-center space-x-2"
+                 >
+                   <Flag className="h-4 w-4" />
+                   <span>Report Post</span>
+                 </button>
+               )}
+             </div>
+           )}
         </div>
       </div>
 
       {/* Post Content */}
-      <div className="mb-4">
-        <p className="text-slate-900 leading-relaxed whitespace-pre-wrap">
-          {post.content}
-        </p>
-        {renderHashtags()}
-        {renderMentions()}
-      </div>
+      {(post.content || post.caption) && (
+        <div className="mb-4">
+          <p className="text-slate-900 leading-relaxed whitespace-pre-wrap">
+            {post.content || post.caption}
+          </p>
+          {renderHashtags()}
+          {renderMentions()}
+        </div>
+      )}
 
       {/* Post Media */}
       {renderMedia()}
@@ -286,19 +314,28 @@ const PostCard = ({ post, onLike, onComment, onShare, onBookmark, onReport }) =>
       {showComments && (
         <div className="mt-4 pt-4 border-t border-slate-100">
           <div className="space-y-3">
-            {/* Comment Input */}
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-accent-500 to-accent-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                U
-              </div>
-              <div className="flex-1">
-                <input
-                  type="text"
-                  placeholder="Write a comment..."
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-300"
-                />
-              </div>
-            </div>
+             {/* Comment Input */}
+             <form onSubmit={handleCommentSubmit} className="flex items-center space-x-3">
+               <div className="w-8 h-8 bg-gradient-to-br from-accent-500 to-accent-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                 U
+               </div>
+               <div className="flex-1">
+                 <input
+                   type="text"
+                   placeholder="Write a comment..."
+                   value={commentText}
+                   onChange={(e) => setCommentText(e.target.value)}
+                   className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-300"
+                 />
+               </div>
+               <button
+                 type="submit"
+                 disabled={!commentText.trim()}
+                 className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+               >
+                 Post
+               </button>
+             </form>
 
             {/* Sample Comments */}
             {post.comments && post.comments.length > 0 && (
